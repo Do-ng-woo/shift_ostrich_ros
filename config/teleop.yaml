@@ -1,0 +1,58 @@
+# Shift Ostrich: reuse the running hardware bridge; no serial access to OpenCR.
+leader:
+  device: /dev/serial/by-id/usb-ROBOTIS_OpenRB-150_AF46F26750323952582E3120FF070E1E-if00
+  baudrate: 1000000
+  # ID 25 is unused: do not read it or depend on its response.
+  ids: [21, 22, 23, 24]
+  names: [joint1, joint2, joint3, joint4]
+  rate_hz: 30.0
+  gripper_spring:
+    enabled: false
+    id: 26
+    open_tick: 2840
+    # ROBOTIS-contributed LeRobot OMX sample: internal mode 5, 100 mA.
+    # XL330-M077 e-Manual factory PID; no host-side torque conversion.
+    controller: omx_current_based_position
+    position_p_gain: 400
+    position_i_gain: 0
+    position_d_gain: 400
+    max_current_ma: 100.0
+    ramp_sec: 1.5
+    control_rate_hz: 100.0
+mapping:
+  leader_names: [joint1, joint2, joint3, joint4, gripper_joint_1]
+  follower_names: [Arm_yaw, Arm_shoulder, Arm_elbow, Arm_waist, gripper_pitch]
+  direction: [1.0, 1.0, -1.0, 1.0, -1.0]
+  scale: [1.0, 1.0, 1.0, 1.0, 0.72]
+  # Bounds relative to the actual follower position captured at enable.
+  # Gripper uses the calibrated closed reference below rather than this relative bound.
+  max_delta_rad: [1.0, 0.7, 0.7, 0.7, 1.0]
+  max_velocity_rad_s: [0.6, 0.6, 0.6, 0.6, 0.3]
+gripper:
+  enabled: false
+  # User supplied physical closed/open Wizard positions: 181.85/142.29 deg.
+  follower_endpoints_verified: true
+  behavior: press_to_close
+  press_threshold: 0.25
+  release_threshold: 0.12
+  # User held both grippers closed, then opened the leader only (2026-11-13).
+  leader_closed_tick: 2028
+  leader_open_tick: 2840
+  follower_closed_tick: 2069
+  # Rounded from Wizard angles using 4096 ticks/revolution (2026-11-13).
+  follower_open_tick: 1619
+control:
+  rate_hz: 10.0
+  leader_timeout_sec: 0.3
+  hardware_timeout_sec: 0.75
+  lower_enable_tolerance_rad: 0.12
+  lower_drift_tolerance_rad: 0.18
+  lower_drift_duration_sec: 0.5
+  lower_velocity_rad_s: 0.15
+topics:
+  hardware_states: /hardware/joint_states
+  leader_states: /leader/joint_states
+  trajectory: /joint_trajectory_controller/joint_trajectory
+  wheel_velocity: /wheel_velocity_controller/commands
+  preview: /manipulator/preview_trajectory
+  status: /manipulator/status

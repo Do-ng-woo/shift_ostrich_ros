@@ -4,10 +4,10 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    package_name = 'biped_bike_robot'
+    package_name = 'shift_ostrich'
     pkg_share = get_package_share_directory(package_name)
 
-    urdf_file = os.path.join(pkg_share, 'urdf', 'biped_bike_robot.urdf')
+    urdf_file = os.path.join(pkg_share, 'urdf', 'shift_ostrich.urdf')
     rviz_config = os.path.join(pkg_share, 'config', 'rviz_config.rviz')
 
     with open(urdf_file, 'r') as infp:

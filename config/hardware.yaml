@@ -1,0 +1,267 @@
+bus:
+  device: /dev/opencr
+  baudrate: 1000000
+  protocol_version: 2.0
+calibration_status: unverified
+joints:
+- id: 1
+  joint_name: R_hip_yaw
+  control_mode: position
+  urdf_axis:
+  - -0.0
+  - -0.0
+  - 1.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 2
+  joint_name: R_hip_roll
+  control_mode: position
+  urdf_axis:
+  - -1.0
+  - 0.0
+  - -0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 3
+  joint_name: R_hip_pitch
+  control_mode: position
+  urdf_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 4
+  joint_name: R_knee_pitch
+  control_mode: position
+  urdf_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 5
+  joint_name: R_ankle_pitch
+  control_mode: position
+  urdf_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 6
+  joint_name: R_wheel
+  control_mode: velocity
+  urdf_axis:
+  - -0.0
+  - -1.0
+  - -0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 1
+  model: XL430-W250
+- id: 7
+  joint_name: L_hip_yaw
+  control_mode: position
+  urdf_axis:
+  - 0.0
+  - -0.0
+  - 1.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 8
+  joint_name: L_hip_roll
+  control_mode: position
+  urdf_axis:
+  - 1.0
+  - -0.0
+  - 0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 9
+  joint_name: L_hip_pitch
+  control_mode: position
+  urdf_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 10
+  joint_name: L_knee_pitch
+  control_mode: position
+  urdf_axis:
+  - -0.0
+  - 1.0
+  - 0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 11
+  joint_name: L_ankle_pitch
+  control_mode: position
+  urdf_axis:
+  - -0.0
+  - 1.0
+  - 0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 12
+  joint_name: L_wheel
+  control_mode: velocity
+  urdf_axis:
+  - 0.0
+  - -1.0
+  - -0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 1
+  model: XL430-W250
+- id: 13
+  joint_name: Arm_yaw
+  control_mode: position
+  urdf_axis:
+  - 0.0
+  - -0.0
+  - 1.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 14
+  joint_name: Arm_shoulder
+  # Wizard position limits; software bounds only, never written to EEPROM.
+  # One turn has 4096 counts, whose valid position indices end at 4095.
+  min_position_tick: 2200
+  max_position_tick: 4095
+  control_mode: position
+  urdf_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XM430-W350-R
+  effort_feedback: current
+  stall_torque_nm: 3.8
+  stall_current_a: 2.1
+- id: 15
+  joint_name: Arm_elbow
+  control_mode: position
+  urdf_axis:
+  - 0.0
+  - 1.0
+  - 0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL430-W250
+- id: 16
+  joint_name: Arm_waist
+  control_mode: position
+  urdf_axis:
+  - -0.0
+  - -1.0
+  - -0.0
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 3
+  model: XL330-M288-T
+  effort_feedback: current
+  current_unit_a: 0.001
+  stall_torque_nm: 0.6
+  stall_current_a: 1.74
+- id: 17
+  # Failed actuator excluded from the live bridge; retain calibration below.
+  active: false
+  joint_name: gripper_pitch
+  control_mode: position
+  urdf_axis: null
+  direction: null
+  direction_checked: false
+  center_tick: null
+  zero_checked: false
+  operating_mode: 5
+  # ID 17 Wizard settings provided by the user (2026-11-13).
+  # Keep motor Drive Mode=1 and Homing Offset=0; do not invert again here.
+  position_p_gain: 250
+  position_i_gain: 0
+  position_d_gain: 600
+  # Match the user's working Wizard/sliders current cap (RAM only).
+  goal_current: 600
+  # Match Wizard: host teleop already limits speed; avoid a second profile.
+  profile_velocity: 0
+  profile_acceleration: 0
+  model: XL330-M288-T
+  effort_feedback: current
+  current_unit_a: 0.001
+  stall_torque_nm: 0.6
+  stall_current_a: 1.74
+conversion:
+  ticks_per_rev: 4096
+  tick_per_rad: 651.8986469044033
+  velocity_unit_rad_per_sec: 0.023980823922402087
+  velocity_raw_per_rad_per_sec: 41.7006433385832
+defaults:
+  effort_feedback: load
+  stall_torque_nm: 1.4
+  current_unit_a: 0.00269
+  stall_current_a: 1.0
+  pwm_limit: null
+  position_p_gain: null
+  position_i_gain: null
+  position_d_gain: null
+  profile_acceleration: null
+  profile_velocity: null

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
+"""Show Shift Ostrich IMU attitude as world -> base_link in RViz."""
 import math
 from typing import Optional
 
 import rclpy
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Imu
 from tf2_ros import TransformBroadcaster
 
@@ -116,8 +118,8 @@ def transpose(m):
 def remap_matrix(remap: str):
     values = {"r": 0, "p": 1, "y": 2}
     remap = remap.strip()
-    if len(remap) != 3:
-        return ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+    if len(remap) != 3 or set(remap.lower()) != set('rpy'):
+        raise ValueError('rpy_remap must contain r, p and y exactly once; uppercase reverses sign')
 
     rows = []
     for key in remap:
@@ -156,10 +158,10 @@ class ImuBaseTf(Node):
         self.declare_parameter("invert_y", False)
         self.declare_parameter("invert_z", False)
         self.declare_parameter("invert_w", False)
-        self.declare_parameter("rpy_remap", "YRp")
-        self.declare_parameter("pivot_x", -0.066549)
-        self.declare_parameter("pivot_y", -0.076779)
-        self.declare_parameter("pivot_z", 0.018299)
+        self.declare_parameter("rpy_remap", "pRy")
+        self.declare_parameter("pivot_x", 0.0)
+        self.declare_parameter("pivot_y", 0.0)
+        self.declare_parameter("pivot_z", 0.0)
         self.declare_parameter("zero_yaw_on_start", True)
         self.declare_parameter("yaw_zero_samples", 10)
 
@@ -175,6 +177,8 @@ class ImuBaseTf(Node):
         self.invert_z = bool(self.get_parameter("invert_z").value)
         self.invert_w = bool(self.get_parameter("invert_w").value)
         self.rpy_remap = self.get_parameter("rpy_remap").value
+        if self.rpy_remap:
+            remap_matrix(self.rpy_remap)
         self.pivot = (
             float(self.get_parameter("pivot_x").value),
             float(self.get_parameter("pivot_y").value),
@@ -188,27 +192,50 @@ class ImuBaseTf(Node):
         self.yaw_zero_correction = (0.0, 0.0, 0.0, 1.0)
 
         self.broadcaster = TransformBroadcaster(self)
+        self.latest_orientation = (0.0, 0.0, 0.0, 1.0)
+        self.last_imu_time = None
+        self.started_at = self.get_clock().now()
         imu_topic = self.get_parameter("imu_topic").value
-        self.subscription = self.create_subscription(Imu, imu_topic, self.imu_callback, 10)
+        self.subscription = self.create_subscription(Imu, imu_topic, self.imu_callback, qos_profile_sensor_data)
+        self.publish_timer = self.create_timer(1./30., self.publish_transform)
         self.get_logger().warn(
             f"Publishing IMU TF {self.parent_frame} -> {self.child_frame} from {imu_topic}"
         )
 
     def imu_callback(self, msg: Imu):
+        raw = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
+        if (msg.orientation_covariance[0] == -1 or not all(math.isfinite(v) for v in raw)
+                or sum(v*v for v in raw) < 1e-12):
+            self.get_logger().warn('Invalid IMU orientation; retaining last valid pose', throttle_duration_sec=5.)
+            return
         q = (
             -msg.orientation.x if self.invert_x else msg.orientation.x,
             -msg.orientation.y if self.invert_y else msg.orientation.y,
             -msg.orientation.z if self.invert_z else msg.orientation.z,
             -msg.orientation.w if self.invert_w else msg.orientation.w,
         )
-        q = normalize(multiply(self.mount_correction, normalize(q)))
+        # q_world_base = q_world_sensor * q_sensor_base. Mounting is a
+        # sensor/body extrinsic, not a rotation of the world coordinate frame.
+        q = normalize(multiply(normalize(q), self.mount_correction))
         if self.rpy_remap:
             q = remap_quaternion(q, self.rpy_remap)
         if self.zero_yaw_on_start:
             q = self.apply_yaw_zero(q)
+        if self.last_imu_time is None:
+            self.get_logger().info('IMU orientation received; RViz attitude tracking active')
+        self.latest_orientation = q
+        self.last_imu_time = self.get_clock().now()
+
+    def publish_transform(self):
+        q = self.latest_orientation
+        now = self.get_clock().now()
+        age = (now-(self.last_imu_time if self.last_imu_time is not None else self.started_at)).nanoseconds*1e-9
+        if age > 2.:
+            self.get_logger().warn('No fresh IMU orientation; showing last pose (identity before first sample)',
+                                   throttle_duration_sec=5.)
 
         transform = TransformStamped()
-        transform.header.stamp = msg.header.stamp
+        transform.header.stamp = now.to_msg()
         transform.header.frame_id = self.parent_frame
         transform.child_frame_id = self.child_frame
         rotated_pivot = rotate_vector(q, self.pivot)
@@ -241,9 +268,12 @@ def main(args: Optional[list[str]] = None):
     node = ImuBaseTf()
     try:
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

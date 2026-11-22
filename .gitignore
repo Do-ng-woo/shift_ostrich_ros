@@ -1,4 +1,10 @@
 # Python
+/debug/
+/test/
+/runtime/
+/docs/
+/legacy/
+
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -15,3 +21,7 @@ Thumbs.db
 # CAD / mesh export files
 *.stl
 *.STL
+
+# The active robot meshes are required after cloning this package.
+!/meshes/*.stl
+!/meshes/*.STL

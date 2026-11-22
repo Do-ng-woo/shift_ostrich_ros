@@ -1,0 +1,172 @@
+{
+  "1": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 2103,
+    "voltage": 11.9,
+    "temperature": 33
+  },
+  "2": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 1880,
+    "voltage": 11.9,
+    "temperature": 35
+  },
+  "3": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 0,
+    "torque": 0,
+    "error": 0,
+    "position": 2515,
+    "voltage": 11.9,
+    "temperature": 34
+  },
+  "4": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 4,
+    "torque": 0,
+    "error": 0,
+    "position": 3485,
+    "voltage": 11.9,
+    "temperature": 34
+  },
+  "5": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 1515,
+    "voltage": 11.8,
+    "temperature": 36
+  },
+  "6": {
+    "model": 1060,
+    "mode": 1,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 112,
+    "voltage": 11.9,
+    "temperature": 33
+  },
+  "7": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 2119,
+    "voltage": 11.8,
+    "temperature": 32
+  },
+  "8": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 4,
+    "torque": 0,
+    "error": 0,
+    "position": 2290,
+    "voltage": 11.9,
+    "temperature": 34
+  },
+  "9": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 4,
+    "torque": 0,
+    "error": 0,
+    "position": 1587,
+    "voltage": 11.9,
+    "temperature": 34
+  },
+  "10": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 0,
+    "torque": 0,
+    "error": 0,
+    "position": 572,
+    "voltage": 11.9,
+    "temperature": 34
+  },
+  "11": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 2657,
+    "voltage": 11.8,
+    "temperature": 34
+  },
+  "12": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 3962,
+    "voltage": 11.8,
+    "temperature": 33
+  },
+  "13": {
+    "model": 1060,
+    "mode": 1,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 3948,
+    "voltage": 11.9,
+    "temperature": 32
+  },
+  "14": {
+    "model": 1020,
+    "mode": 3,
+    "drive_mode": 0,
+    "torque": 0,
+    "error": 0,
+    "position": 2185,
+    "voltage": 12.0,
+    "temperature": 30
+  },
+  "15": {
+    "model": 1060,
+    "mode": 3,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 2013,
+    "voltage": 11.9,
+    "temperature": 31
+  },
+  "16": {
+    "model": 1200,
+    "mode": 3,
+    "drive_mode": 4,
+    "torque": 0,
+    "error": 0,
+    "position": 1683,
+    "voltage": 6.0,
+    "temperature": 23
+  },
+  "17": {
+    "model": 1200,
+    "mode": 3,
+    "drive_mode": 1,
+    "torque": 0,
+    "error": 0,
+    "position": 1865,
+    "voltage": 6.0,
+    "temperature": 23
+  }
+}

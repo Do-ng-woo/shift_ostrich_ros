@@ -1,54 +1,29 @@
 cmake_minimum_required(VERSION 3.8)
-project(biped_bike_robot)
-
+project(shift_ostrich)
 find_package(ament_cmake REQUIRED)
-
-if(BUILD_TESTING)
-  find_package(Python3 REQUIRED COMPONENTS Interpreter)
-  find_package(ament_cmake_pytest REQUIRED)
-  ament_add_pytest_test(trajectory_interpolation_test
-    test/test_trajectory_interpolation.py
-    PYTHON_EXECUTABLE /usr/bin/python3
-  )
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+find_package(fcl REQUIRED)
+add_library(shift_mesh_interference SHARED core/mesh_interference.cpp)
+target_link_libraries(shift_mesh_interference fcl)
+install(TARGETS shift_mesh_interference LIBRARY DESTINATION lib)
+file(GLOB cad_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/urdf/*.xacro" "${CMAKE_CURRENT_SOURCE_DIR}/meshes/*.stl")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${cad_sources}
+  "${CMAKE_CURRENT_SOURCE_DIR}/core/patch_urdf.py" "${CMAKE_CURRENT_SOURCE_DIR}/core/model_geometry.py")
+execute_process(COMMAND /usr/bin/python3 ${CMAKE_CURRENT_SOURCE_DIR}/core/patch_urdf.py RESULT_VARIABLE export_result)
+if(NOT export_result EQUAL 0)
+  message(FATAL_ERROR "Could not prepare Fusion export")
 endif()
-
-install(DIRECTORY
-  config
-  launch
-  meshes
-  urdf
-  DESTINATION share/${PROJECT_NAME}
-)
-
-install(DIRECTORY RL_walking
-  DESTINATION share/${PROJECT_NAME}
-  PATTERN "__pycache__" EXCLUDE
-  PATTERN "*.pyc" EXCLUDE
-  PATTERN "logs/*.csv" EXCLUDE
-)
-
-install(DIRECTORY manipulator
-  DESTINATION share/${PROJECT_NAME}
-  PATTERN "__pycache__" EXCLUDE
-  PATTERN "*.pyc" EXCLUDE
-  PATTERN "data" EXCLUDE
-  PATTERN "tests" EXCLUDE
-)
-
-install(PROGRAMS
-  scripts/patch_urdf.py
-  scripts/ready_posture.py
-  scripts/ik_walker.py
-  scripts/transform_bike.py
-  scripts/bike_transform_sequence.py
-  scripts/revert_bike.py
-  scripts/bike_teleop.py
-  scripts/transform_bike_reverse.py
-  scripts/dxl_joint_state_bridge.py
-  scripts/imu_base_tf.py
-  scripts/opencr_imu_reader.py
-  scripts/web_control.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
+install(DIRECTORY meshes worlds DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY core DESTINATION share/${PROJECT_NAME}
+  PATTERN "__pycache__" EXCLUDE PATTERN "*.pyc" EXCLUDE)
+install(DIRECTORY core DESTINATION lib/${PROJECT_NAME}
+  PATTERN "__pycache__" EXCLUDE PATTERN "*.pyc" EXCLUDE)
+install(FILES core/gripper_spring.py
+  DESTINATION lib/${PROJECT_NAME} RENAME shift_gripper_spring.py)
+install(FILES urdf/shift_ostrich.urdf urdf/shift_ostrich_controlled.urdf urdf/spawn_geometry.json DESTINATION share/${PROJECT_NAME}/urdf)
+install(FILES launch/gazebo.launch.py launch/display.launch.py launch/transform.launch.py launch/hardware_display.launch.py launch/teleop.launch.py launch/ch_policy_hardware.launch.py DESTINATION share/${PROJECT_NAME}/launch)
+install(FILES config/rviz_config.rviz config/hardware_rviz.rviz config/controllers.yaml config/hardware.yaml config/teleop.yaml DESTINATION share/${PROJECT_NAME}/config)
+install(DIRECTORY config/motions DESTINATION share/${PROJECT_NAME}/config)
+install(PROGRAMS scripts/j146_policy.py scripts/transform.py scripts/revert.py scripts/ready_posture.py scripts/arm_teleop.py scripts/leader_reader.py scripts/dxl_joint_state_bridge.py scripts/imu_base_tf.py DESTINATION lib/${PROJECT_NAME})
+install(FILES README.md DESTINATION share/${PROJECT_NAME})
 ament_package()

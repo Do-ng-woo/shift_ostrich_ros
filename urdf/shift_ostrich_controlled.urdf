@@ -1,0 +1,580 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="shift_ostrich">
+  <link name="base_link">
+    <inertial>
+      <origin xyz="-0.01971777753018439 5.072165780200158e-05 0.18837183550956269" rpy="0 0 0" />
+      <mass value="0.40711169248879825" />
+      <inertia ixx="0.000647" iyy="0.000905" izz="0.000998" ixy="2e-06" iyz="8e-06" ixz="-0.000147" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/base_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/base_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="R_Hip_roll2Hip_yaw_1_1">
+    <inertial>
+      <origin xyz="0.0006553372759970783 0.0002406816612214452 -0.032323125513636086" rpy="0 0 0" />
+      <mass value="0.07567328185559695" />
+      <inertia ixx="2.1e-05" iyy="2.4e-05" izz="1.3e-05" ixy="-0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.019543 0.025545 -0.181706" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/R_Hip_roll2Hip_yaw_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.019543 0.025545 -0.181706" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/R_Hip_roll2Hip_yaw_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="R_Hippitch2Hiproll_1_1">
+    <inertial>
+      <origin xyz="-0.01901144799659828 -0.04628199371446903 -0.022680464711314435" rpy="0 0 0" />
+      <mass value="0.07909501854951188" />
+      <inertia ixx="2.8e-05" iyy="2.4e-05" izz="1.8e-05" ixy="-0.0" iyz="-2e-06" ixz="-0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.038543 0.025295 -0.159206" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/R_Hippitch2Hiproll_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.038543 0.025295 -0.159206" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/R_Hippitch2Hiproll_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="R_Knee2Hippitch_1_1">
+    <inertial>
+      <origin xyz="7.999282648253614e-07 0.019000192626889817 -0.017749038465236275" rpy="0 0 0" />
+      <mass value="0.0030017631114552298" />
+      <inertia ixx="1.6666666666666665e-06" iyy="3.3333433333333338e-07" izz="1.3333333333333334e-06" ixy="0" iyz="0" ixz="0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.019543 0.091295 -0.122456" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/R_Knee2Hippitch_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.019543 0.091295 -0.122456" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/R_Knee2Hippitch_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="R_Anklepitch2Knee_1_1">
+    <inertial>
+      <origin xyz="0.009631901648161138 0.018776151203484845 -0.030025522608921898" rpy="0 0 0" />
+      <mass value="0.2212643682252885" />
+      <inertia ixx="0.000193" iyy="0.000225" izz="7.7e-05" ixy="-2e-06" iyz="-2e-06" ixz="-3.5e-05" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.019543 0.091295 -0.086956" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/R_Anklepitch2Knee_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.019543 0.091295 -0.086956" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/R_Anklepitch2Knee_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="R_foot_1_1">
+    <inertial>
+      <origin xyz="-0.0013341083336654881 0.01925019250970092 -0.02447434301705835" rpy="0 0 0" />
+      <mass value="0.04036535015429528" />
+      <inertia ixx="9e-06" iyy="3.1e-05" izz="3.8e-05" ixy="0.0" iyz="0.0" ixz="-0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.019543 0.091295 -0.010456" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/R_foot_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.019543 0.091295 -0.010456" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/R_foot_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="R_wheel_1_1">
+    <inertial>
+      <origin xyz="2.5592485101977314e-07 0.01234137543608027 -1.2036075427990234e-07" rpy="0 0 0" />
+      <mass value="0.015077155398913997" />
+      <inertia ixx="4e-06" iyy="7e-06" izz="4e-06" ixy="-0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.048043 0.053295 -0.062956" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/R_wheel_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.048043 0.053295 -0.062956" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/R_wheel_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="L_Hip_roll2Hip_yaw_1_1">
+    <inertial>
+      <origin xyz="0.0006553372887335811 -0.00024027523907365483 -0.032323125411622106" rpy="0 0 0" />
+      <mass value="0.07567328190501145" />
+      <inertia ixx="2.1e-05" iyy="2.4e-05" izz="1.3e-05" ixy="0.0" iyz="-0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.019543 -0.024955 -0.181706" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/L_Hip_roll2Hip_yaw_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.019543 -0.024955 -0.181706" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/L_Hip_roll2Hip_yaw_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="L_Hippitch2Hiproll_1_1">
+    <inertial>
+      <origin xyz="-0.019011447996594957 0.04628240011771301 -0.022680464711310466" rpy="0 0 0" />
+      <mass value="0.07909501854950102" />
+      <inertia ixx="2.8e-05" iyy="2.4e-05" izz="1.8e-05" ixy="0.0" iyz="2e-06" ixz="-0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.038543 -0.024705 -0.159206" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/L_Hippitch2Hiproll_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.038543 -0.024705 -0.159206" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/L_Hippitch2Hiproll_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="L_Knee2Hippitch_1_1">
+    <inertial>
+      <origin xyz="7.999282656094564e-07 -0.018999786222958864 -0.017749038465237704" rpy="0 0 0" />
+      <mass value="0.0030017631114540853" />
+      <inertia ixx="1.6666666666666665e-06" iyy="3.3333433333333338e-07" izz="1.3333333333333334e-06" ixy="0" iyz="0" ixz="0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.019543 -0.090705 -0.122456" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/L_Knee2Hippitch_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.019543 -0.090705 -0.122456" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/L_Knee2Hippitch_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="L_Anklepitch2Knee_1_1">
+    <inertial>
+      <origin xyz="0.009631901648166623 -0.018775745733571908 -0.030025522608915077" rpy="0 0 0" />
+      <mass value="0.2212643682252882" />
+      <inertia ixx="0.000193" iyy="0.000225" izz="7.7e-05" ixy="2e-06" iyz="2e-06" ixz="-3.5e-05" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.019543 -0.090705 -0.086956" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/L_Anklepitch2Knee_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.019543 -0.090705 -0.086956" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/L_Anklepitch2Knee_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="L_foot_2_1">
+    <inertial>
+      <origin xyz="-0.0013341083336606933 -0.01924978610576228 -0.02447434301705457" rpy="0 0 0" />
+      <mass value="0.040365350154312134" />
+      <inertia ixx="9e-06" iyy="3.1e-05" izz="3.8e-05" ixy="-0.0" iyz="-0.0" ixz="-0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.019543 -0.090705 -0.010456" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/L_foot_2_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.019543 -0.090705 -0.010456" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/L_foot_2_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="L_wheel_1_1">
+    <inertial>
+      <origin xyz="2.6625039189348554e-07 -0.012340967139246178 -1.102749614401155e-07" rpy="0 0 0" />
+      <mass value="0.015077145878498907" />
+      <inertia ixx="4e-06" iyy="7e-06" izz="4e-06" ixy="0.0" iyz="0.0" ixz="0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="-0.048043 -0.052705 -0.062956" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/L_wheel_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="-0.048043 -0.052705 -0.062956" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/L_wheel_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="ARM__link1_1_1">
+    <inertial>
+      <origin xyz="0.00017540553876530147 0.000642150054389539 0.03045376338584374" rpy="0 0 0" />
+      <mass value="0.07721813755926547" />
+      <inertia ixx="2.3e-05" iyy="2.1e-05" izz="1.3e-05" ixy="0.0" iyz="-0.0" ixz="-0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="0.010157 0.000295 -0.223706" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/ARM__link1_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="0.010157 0.000295 -0.223706" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/ARM__link1_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="ARM_link2_1_1">
+    <inertial>
+      <origin xyz="-0.12701105067206486 -0.01885577412538959 0.024315955382354565" rpy="0 0 0" />
+      <mass value="0.15182961046580007" />
+      <inertia ixx="7.8e-05" iyy="0.000294" izz="0.000255" ixy="1e-06" iyz="-1e-06" ixz="4.1e-05" />
+    </inertial>
+    <visual>
+      <origin xyz="0.009957 -0.018705 -0.244206" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/ARM_link2_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="0.009957 -0.018705 -0.244206" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/ARM_link2_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="ARM_link3_1_1">
+    <inertial>
+      <origin xyz="0.07443232065439132 -0.01959028323741193 5.217393815870608e-06" rpy="0 0 0" />
+      <mass value="0.06515069566992972" />
+      <inertia ixx="1e-05" iyy="6.9e-05" izz="7.5e-05" ixy="1e-06" iyz="-0.0" ixz="-0.0" />
+    </inertial>
+    <visual>
+      <origin xyz="0.148945 -0.018505 -0.298024" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/ARM_link3_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="0.148945 -0.018505 -0.298024" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/ARM_link3_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="ARM_link4_1_1">
+    <inertial>
+      <origin xyz="0.038752561152397044 -0.014717048209123609 0.004856992827470319" rpy="0 0 0" />
+      <mass value="0.05532132186583316" />
+      <inertia ixx="1.2e-05" iyy="2.5e-05" izz="2.7e-05" ixy="-1e-06" iyz="-0.0" ixz="-1e-06" />
+    </inertial>
+    <visual>
+      <origin xyz="0.036945 -0.014005 -0.298024" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/ARM_link4_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="silver" />
+    </visual>
+    <collision>
+      <origin xyz="0.036945 -0.014005 -0.298024" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://shift_ostrich/meshes/collision/ARM_link4_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="R_hip_yaw" type="continuous">
+    <origin xyz="0.019543 -0.025545 0.181706" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="R_Hip_roll2Hip_yaw_1_1" />
+    <axis xyz="-0.0 -0.0 1.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="R_hip_roll" type="continuous">
+    <origin xyz="0.019 0.00025 -0.0225" rpy="0 0 0" />
+    <parent link="R_Hip_roll2Hip_yaw_1_1" />
+    <child link="R_Hippitch2Hiproll_1_1" />
+    <axis xyz="-1.0 0.0 -0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="R_hip_pitch" type="continuous">
+    <origin xyz="-0.019 -0.066 -0.03675" rpy="0 0 0" />
+    <parent link="R_Hippitch2Hiproll_1_1" />
+    <child link="R_Knee2Hippitch_1_1" />
+    <axis xyz="0.0 1.0 0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="R_knee_pitch" type="continuous">
+    <origin xyz="0.0 0.0 -0.0355" rpy="0 0 0" />
+    <parent link="R_Knee2Hippitch_1_1" />
+    <child link="R_Anklepitch2Knee_1_1" />
+    <axis xyz="0.0 1.0 0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="R_ankle_pitch" type="continuous">
+    <origin xyz="0.0 0.0 -0.0765" rpy="0 0 0" />
+    <parent link="R_Anklepitch2Knee_1_1" />
+    <child link="R_foot_1_1" />
+    <axis xyz="0.0 1.0 0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="R_wheel" type="continuous">
+    <origin xyz="0.0285 0.038 -0.024" rpy="0 0 0" />
+    <parent link="R_Anklepitch2Knee_1_1" />
+    <child link="R_wheel_1_1" />
+    <axis xyz="-0.0 -1.0 -0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="L_hip_yaw" type="continuous">
+    <origin xyz="0.019543 0.024955 0.181706" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="L_Hip_roll2Hip_yaw_1_1" />
+    <axis xyz="0.0 -0.0 1.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="L_hip_roll" type="continuous">
+    <origin xyz="0.019 -0.00025 -0.0225" rpy="0 0 0" />
+    <parent link="L_Hip_roll2Hip_yaw_1_1" />
+    <child link="L_Hippitch2Hiproll_1_1" />
+    <axis xyz="1.0 -0.0 0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="L_hip_pitch" type="continuous">
+    <origin xyz="-0.019 0.066 -0.03675" rpy="0 0 0" />
+    <parent link="L_Hippitch2Hiproll_1_1" />
+    <child link="L_Knee2Hippitch_1_1" />
+    <axis xyz="0.0 1.0 0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="L_knee_pitch" type="continuous">
+    <origin xyz="0.0 0.0 -0.0355" rpy="0 0 0" />
+    <parent link="L_Knee2Hippitch_1_1" />
+    <child link="L_Anklepitch2Knee_1_1" />
+    <axis xyz="-0.0 1.0 0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="L_ankle_pitch" type="continuous">
+    <origin xyz="0.0 0.0 -0.0765" rpy="0 0 0" />
+    <parent link="L_Anklepitch2Knee_1_1" />
+    <child link="L_foot_2_1" />
+    <axis xyz="-0.0 1.0 0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="L_wheel" type="continuous">
+    <origin xyz="0.0285 -0.038 -0.024" rpy="0 0 0" />
+    <parent link="L_Anklepitch2Knee_1_1" />
+    <child link="L_wheel_1_1" />
+    <axis xyz="0.0 -1.0 -0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="Arm_yaw" type="continuous">
+    <origin xyz="-0.010157 -0.000295 0.223706" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="ARM__link1_1_1" />
+    <axis xyz="0.0 -0.0 1.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="Arm_shoulder" type="continuous">
+    <origin xyz="0.0002 0.019 0.0205" rpy="0 0 0" />
+    <parent link="ARM__link1_1_1" />
+    <child link="ARM_link2_1_1" />
+    <axis xyz="0.0 1.0 0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="Arm_elbow" type="continuous">
+    <origin xyz="-0.138988 -0.0002 0.053818" rpy="0 0 0" />
+    <parent link="ARM_link2_1_1" />
+    <child link="ARM_link3_1_1" />
+    <axis xyz="0.0 1.0 0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <joint name="Arm_waist" type="continuous">
+    <origin xyz="0.112 -0.0045 0.0" rpy="0 0 0" />
+    <parent link="ARM_link3_1_1" />
+    <child link="ARM_link4_1_1" />
+    <axis xyz="-0.0 -1.0 -0.0" />
+    <dynamics damping="0.05" friction="0.0" />
+  </joint>
+  <material name="silver">
+    <color rgba="0.700 0.700 0.700 1.000" />
+  </material>
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+    <joint name="R_hip_yaw">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="R_hip_roll">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="R_hip_pitch">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="R_knee_pitch">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="R_ankle_pitch">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="R_wheel">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="L_hip_yaw">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="L_hip_roll">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="L_hip_pitch">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="L_knee_pitch">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="L_ankle_pitch">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="L_wheel">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="Arm_yaw">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="Arm_shoulder">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="Arm_elbow">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="Arm_waist">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+  </ros2_control>
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(find shift_ostrich)/config/controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+</robot>

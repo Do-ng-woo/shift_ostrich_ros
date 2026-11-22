@@ -1,0 +1,40 @@
+{
+  "saved_at": "2026-11-13",
+  "model_sha256": "1c3bcd6d47c30ce9f66e7a2623fbad5447359b512d4c6e3b589325fb7627469d",
+  "motions": {
+    "transform": {
+      "sha256": "64de97ada5b6dd6ea788fa7d573b31f290216471f1a78aa12d07839c840d7244",
+      "duration_sec": 20.0,
+      "waypoints": 16,
+      "derived_from": {
+        "motion": "revert",
+        "sha256": "58a578941154b70aa4389bb2b8a56ced16e7f9238ee57db731a62c730f1f95b1",
+        "method": "reverse movement intervals; transfer initial hold to READY; split final leg extension and ankle turn",
+        "initial_hold_sec": 0.689655172,
+        "final_ankle_turn_sec": 0.9
+      }
+    },
+    "revert": {
+      "sha256": "58a578941154b70aa4389bb2b8a56ced16e7f9238ee57db731a62c730f1f95b1",
+      "duration_sec": 20.0,
+      "waypoints": 15
+    }
+  },
+  "verification_status": "passed",
+  "verified_runs": [
+    "docs/transform_reverse_revert_replay.json",
+    "docs/transform_reverse_revert_mesh.json",
+    "docs/transform_reverse_revert_hardware_mesh.json"
+  ],
+  "note": "Transform is based on the unchanged revert in reverse, preserving its original knots and reversed movement times. One final support waypoint separates leg extension at ankle -60 degrees from the last 0.9s ankle turn. 16 transform waypoints, 20s total; revert unchanged. Both saved and hardware-adapted target paths passed nonadjacent STL sampling at 0.5deg. Isolated free-base Gazebo round trip passed with no native internal contacts. No physical hardware validation.",
+  "previous_transform_replay": {
+    "transform_status": 4,
+    "revert_status": 4,
+    "final_pitch_deg": -0.00011221048670172781,
+    "internal_contact_count": {
+      "transform": 0,
+      "revert": 0
+    }
+  },
+  "updated_at": "2026-11-20"
+}

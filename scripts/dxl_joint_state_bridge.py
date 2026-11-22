@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
+"""Shift Ostrich real-motor bridge, measured state display and direction tests."""
 import csv
 import datetime as dt
 import math
+import fcntl
+import json
+from pathlib import Path
 import os
 import struct
+import time
 from typing import Dict, List, Optional, Tuple
 
 import rclpy
@@ -11,8 +16,10 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from sensor_msgs.msg import Imu, JointState
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, String
+from rclpy.qos import QoSProfile, DurabilityPolicy
 from trajectory_msgs.msg import JointTrajectory
+from std_srvs.srv import Trigger
 
 try:
     from dynamixel_sdk import COMM_SUCCESS, GroupSyncRead, GroupSyncWrite, PacketHandler, PortHandler
@@ -32,6 +39,7 @@ ADDR_POSITION_D_GAIN = 80
 ADDR_POSITION_I_GAIN = 82
 ADDR_POSITION_P_GAIN = 84
 ADDR_GOAL_VELOCITY = 104
+ADDR_GOAL_CURRENT = 102
 ADDR_PROFILE_ACCELERATION = 108
 ADDR_PROFILE_VELOCITY = 112
 ADDR_GOAL_POSITION = 116
@@ -49,10 +57,6 @@ LEN_OPENCR_IMU_BLOCK = 68
 STANDARD_GRAVITY = 9.80665
 TORQUE_DISABLE = 0
 TORQUE_ENABLE = 1
-READY_HIP_PITCH_RAD = 0.0
-READY_KNEE_PITCH_RAD = -0.30
-READY_ANKLE_FORWARD_OFFSET_RAD = 0.174533
-READY_ANKLE_PITCH_RAD = 0.15 + READY_ANKLE_FORWARD_OFFSET_RAD
 HARDWARE_ERROR_BITS = {
     0: "input_voltage",
     2: "overheating",
@@ -102,22 +106,35 @@ class MotorConfig:
         self.joint_name = data["joint_name"]
         self.control_mode = data["control_mode"]
         self.operating_mode = int(data["operating_mode"])
-        self.center_tick = int(data.get("center_tick", 2048))
-        self.direction = int(data.get("direction", 1))
+        if (self.control_mode not in ('position', 'velocity') or
+                self.control_mode == 'position' and self.operating_mode not in (3, 5) or
+                self.control_mode == 'velocity' and self.operating_mode != 1):
+            raise ValueError(f'ID {self.id}: expected position mode 3/5 or wheel velocity mode 1')
+        self.direction_checked = bool(data.get("direction_checked", False))
+        self.zero_checked = bool(data.get("zero_checked", False))
+        direction, center = data.get("direction"), data.get("center_tick")
+        if direction is not None and direction not in (-1, 1):
+            raise ValueError(f"ID {self.id}: direction must be +1 or -1")
+        self.center_tick = 2048 if center is None else int(center)
+        self.direction = 1 if direction is None else int(direction)
+        self.configured_min_tick = int(data.get('min_position_tick', 0))
+        self.configured_max_tick = int(data.get('max_position_tick', 4095))
+        if not 0 <= self.configured_min_tick <= self.configured_max_tick <= 4095:
+            raise ValueError(f'ID {self.id}: invalid configured position limits')
+        self.min_tick = self.configured_min_tick
+        self.max_tick = self.configured_max_tick
         self.active = bool(data.get("active", True))
         self.tick_per_rad = tick_per_rad
-        self.min_position_rad = float(data.get("min_position_rad", -math.inf))
-        self.max_position_rad = float(data.get("max_position_rad", math.inf))
-        max_abs_position_rad = data.get("max_abs_position_rad")
-        self.max_abs_position_rad = (
-            None if max_abs_position_rad is None else float(max_abs_position_rad)
-        )
         self.pwm_limit = data.get("pwm_limit")
         self.position_p_gain = data.get("position_p_gain")
         self.position_i_gain = data.get("position_i_gain")
         self.position_d_gain = data.get("position_d_gain")
         self.profile_acceleration = data.get("profile_acceleration")
         self.profile_velocity = data.get("profile_velocity")
+        self.goal_current = data.get('goal_current')
+        if self.operating_mode == 5 and (self.goal_current is None or
+                not math.isfinite(self.goal_current) or self.goal_current <= 0):
+            raise ValueError(f'ID {self.id}: current-based position mode needs a positive goal_current cap')
         self.model = str(data.get("model", "unknown"))
         self.effort_feedback = str(data.get("effort_feedback", "load"))
         self.stall_torque_nm = float(data.get("stall_torque_nm", 1.4))
@@ -135,18 +152,10 @@ class MotorConfig:
 
     def position_to_tick(self, position_rad: float) -> int:
         tick = self.center_tick + self.direction * position_rad * self.tick_per_rad
-        return int(round(max(0, min(4095, tick))))
+        return max(0, min(4095, int(round(tick))))
 
     def tick_to_position(self, tick: int) -> float:
         return (tick - self.center_tick) / (self.direction * self.tick_per_rad)
-
-    def position_in_range(self, position_rad: float) -> bool:
-        return self.min_position_rad <= position_rad <= self.max_position_rad
-
-    def command_abs_limit(self, default_limit: float) -> float:
-        if self.max_abs_position_rad is not None:
-            return self.max_abs_position_rad
-        return default_limit
 
     def velocity_to_raw(self, velocity_rad_s: float, raw_per_rad_s: float) -> int:
         raw = round(self.direction * velocity_rad_s * raw_per_rad_s)
@@ -158,18 +167,23 @@ class DxlJointStateBridge(Node):
         super().__init__("dxl_joint_state_bridge")
 
         self.declare_parameter("config_path", "")
+        self.declare_parameter("usb_settle_sec", 1.0)
+        self.declare_parameter("startup_ping_attempts", 5)
+        self.declare_parameter("startup_retry_delay_sec", 0.3)
         self.declare_parameter("torque_on_start", True)
+        self.declare_parameter("motor_ids", "")
+        self.declare_parameter("torque_motor_ids", "")
+        self.declare_parameter("joint_command_topic", "/hardware/joint_commands")
         self.declare_parameter("torque_off_on_shutdown", True)
+        self.declare_parameter('preserve_existing_torque_on_failure', False)
         self.declare_parameter("center_on_start", False)
         self.declare_parameter("startup_ready_posture_on_start", False)
-        self.declare_parameter("startup_forward_lean_deg", 0.0)
-        self.declare_parameter("startup_shoulder_pitch_deg", -70.0)
-        self.declare_parameter("max_abs_position_rad", 0.35)
         self.declare_parameter("min_tick_change", 2)
         self.declare_parameter("log_joint_states", True)
         self.declare_parameter("enable_joint_state_commands", True)
-        self.declare_parameter("enable_trajectory_commands", True)
-        self.declare_parameter("enable_velocity_commands", True)
+        self.declare_parameter("enable_trajectory_commands", False)
+        self.declare_parameter("enable_velocity_commands", False)
+        self.declare_parameter("passive_wheels", False)
         self.declare_parameter(
             "trajectory_topic", "/joint_trajectory_controller/joint_trajectory"
         )
@@ -183,13 +197,14 @@ class DxlJointStateBridge(Node):
         self.declare_parameter("telemetry_rate_hz", 5.0)
         self.declare_parameter("telemetry_duration_sec", 10.0)
         self.declare_parameter("telemetry_motor_ids", "")
-        self.declare_parameter("publish_present_joint_states", False)
+        self.declare_parameter("publish_present_joint_states", True)
         self.declare_parameter("present_joint_state_topic", "/joint_states")
         self.declare_parameter("present_joint_state_rate_hz", 15.0)
+        self.declare_parameter("sync_policy_feedback", False)
         self.declare_parameter("enable_opencr_imu", False)
         self.declare_parameter("opencr_imu_id", 200)
         self.declare_parameter("opencr_imu_topic", "/opencr/imu")
-        self.declare_parameter("opencr_imu_frame_id", "body_link")
+        self.declare_parameter("opencr_imu_frame_id", "base_link")
         self.declare_parameter("opencr_imu_rate_hz", 30.0)
 
         if PacketHandler is None or PortHandler is None:
@@ -199,8 +214,8 @@ class DxlJointStateBridge(Node):
 
         config_path = self.get_parameter("config_path").get_parameter_value().string_value
         if not config_path:
-            pkg_share = get_package_share_directory("biped_bike_robot")
-            config_path = os.path.join(pkg_share, "config", "dynamixel_hardware.yaml")
+            pkg_share = get_package_share_directory("shift_ostrich")
+            config_path = os.path.join(pkg_share, "config", "hardware.yaml")
 
         self.config = self._load_config(config_path)
         self.port_handler = PortHandler(self.config["bus"]["device"])
@@ -218,6 +233,9 @@ class DxlJointStateBridge(Node):
             LEN_GOAL_VELOCITY,
         )
         self.group_sync_read = None
+        self.enabled_by_bridge = set()
+        self.preexisting_torque_ids = set()
+        self.startup_complete = False
         self.last_goal_ticks: Dict[int, int] = {}
         self.last_goal_velocities: Dict[int, int] = {}
         self.last_velocity_command_time = None
@@ -233,9 +251,6 @@ class DxlJointStateBridge(Node):
         self.telemetry_motors = []
         self.opencr_imu_warned = False
 
-        self.max_abs_position_rad = (
-            self.get_parameter("max_abs_position_rad").get_parameter_value().double_value
-        )
         self.min_tick_change = (
             self.get_parameter("min_tick_change").get_parameter_value().integer_value
         )
@@ -258,10 +273,20 @@ class DxlJointStateBridge(Node):
         ]
         self.joint_to_motor = {motor.joint_name: motor for motor in self.position_motors}
 
+        if (self.get_parameter("publish_present_joint_states").value and
+                self.get_parameter("joint_command_topic").value == self.get_parameter("present_joint_state_topic").value):
+            raise ValueError("Command and measured-state topics must differ")
+        if not self.get_parameter("torque_on_start").value and any(self.get_parameter(p).value for p in
+                ("enable_joint_state_commands", "enable_trajectory_commands", "enable_velocity_commands",
+                 "center_on_start", "startup_ready_posture_on_start")):
+            raise ValueError("Command interfaces require torque_on_start:=true")
+
         self._open_bus()
-        self._configure_motors(
-            torque_on_start=self.get_parameter("torque_on_start").value
-        )
+        try:
+            self._configure_motors(torque_on_start=self.get_parameter("torque_on_start").value)
+        except Exception:
+            self._release_bus(force_off=True)
+            raise
         if self.get_parameter("center_on_start").value:
             self._center_position_motors()
         if self.get_parameter("startup_ready_posture_on_start").value:
@@ -277,17 +302,14 @@ class DxlJointStateBridge(Node):
         joint_state_commands_enabled = bool(
             self.get_parameter("enable_joint_state_commands").value
         )
-        if publish_present_joint_states and present_joint_state_topic == "/joint_states":
-            joint_state_commands_enabled = False
-            self.get_logger().warn(
-                "Disabled /joint_states command subscription because present "
-                "hardware joint states are being published on /joint_states"
-            )
+        command_topic = self.get_parameter("joint_command_topic").value
+        if publish_present_joint_states and command_topic == present_joint_state_topic:
+            raise ValueError("Command and measured-state topics must differ")
 
         if joint_state_commands_enabled:
             self.subscription = self.create_subscription(
                 JointState,
-                "/joint_states",
+                command_topic,
                 self.joint_state_callback,
                 10,
             )
@@ -325,26 +347,36 @@ class DxlJointStateBridge(Node):
 
         names = ", ".join(m.joint_name for m in self.position_motors)
         self.get_logger().info(f"Configured Dynamixel position motors: {names}")
+        self.startup_complete = True
+        self.create_service(Trigger, '~/gripper_status', self.gripper_status_callback)
+
+    def _release_bus(self, force_off=False):
+        self.port_handler.is_using = False
+        for motor in self.all_motors:
+            if motor.id not in self.enabled_by_bridge:
+                continue
+            try:
+                if motor.control_mode == "velocity":
+                    self._write4(motor.id, ADDR_GOAL_VELOCITY, 0)
+                if force_off or self.get_parameter("torque_off_on_shutdown").value:
+                    if (force_off and self.get_parameter('preserve_existing_torque_on_failure').value
+                            and motor.id in self.preexisting_torque_ids
+                            and motor.id not in getattr(self, 'faulted_motor_ids', set())):
+                        continue
+                    self._write1(motor.id, ADDR_TORQUE_ENABLE, TORQUE_DISABLE)
+            except Exception as exc:
+                self.get_logger().error(f"ID {motor.id}: shutdown command failed: {exc}")
+                self.port_handler.is_using = False
+        if getattr(self.port_handler, 'ser', None) is not None:
+            self.port_handler.closePort()
+        self.enabled_by_bridge.clear()
+        if hasattr(self, "bus_lock"):
+            self.bus_lock.close()
 
     def destroy_node(self):
-        try:
-            if self.velocity_motors:
-                self._sync_write_goal_velocities(
-                    {motor: 0 for motor in self.velocity_motors}
-                )
-            if self.get_parameter("torque_off_on_shutdown").value:
-                for motor in self.all_motors:
-                    self._write1(motor.id, ADDR_TORQUE_ENABLE, TORQUE_DISABLE)
-                self.get_logger().warn("Disabled Dynamixel torque on shutdown")
-            else:
-                self.get_logger().warn(
-                    "Keeping Dynamixel torque enabled on shutdown; wheels commanded to zero"
-                )
-        finally:
-            if self.telemetry_file is not None:
-                self.telemetry_file.close()
-            if hasattr(self, "port_handler"):
-                self.port_handler.closePort()
+        self._release_bus(force_off=not self.startup_complete)
+        if self.telemetry_file is not None:
+            self.telemetry_file.close()
         super().destroy_node()
 
     def _load_config(self, config_path: str) -> dict:
@@ -354,12 +386,25 @@ class DxlJointStateBridge(Node):
         return config
 
     def _load_active_motors(self) -> List[MotorConfig]:
+        passive_wheels = bool(self.get_parameter("passive_wheels").value)
+        if passive_wheels and self.get_parameter("enable_velocity_commands").value:
+            raise ValueError("passive_wheels and velocity commands cannot both be enabled")
         tick_per_rad = float(self.config["conversion"]["tick_per_rad"])
         defaults = self.config.get("defaults", {})
         motors = []
+        requested = self.get_parameter("motor_ids").value.strip()
+        selected = {int(i) for i in requested.split(',')} if requested else None
         for joint in self.config["joints"]:
+            joint = dict(joint)
             if not joint.get("active", True):
                 continue
+            if selected is not None and joint['id'] not in selected:
+                continue
+            # Manual sliders test every joint, including both wheel axes.
+            # Explicit velocity-command mode keeps the configured wheel modes.
+            if (joint['control_mode'] == 'velocity' and not passive_wheels
+                    and not self.get_parameter('enable_velocity_commands').value):
+                joint.update(control_mode='position', operating_mode=3)
             for key in (
                 "model",
                 "effort_feedback",
@@ -372,38 +417,176 @@ class DxlJointStateBridge(Node):
                 "position_d_gain",
                 "profile_acceleration",
                 "profile_velocity",
+                "goal_current",
             ):
                 if key not in joint:
                     joint[key] = defaults.get(key)
             motors.append(MotorConfig(joint, tick_per_rad))
+        if not motors or len({m.id for m in motors}) != len(motors):
+            raise ValueError("Empty motor selection or duplicate motor IDs")
+        if len({m.joint_name for m in motors}) != len(motors):
+            raise ValueError("Duplicate joint names")
+        if selected is not None and selected != {m.id for m in motors}:
+            raise ValueError("Unknown or inactive motor selected")
         return motors
 
     def _open_bus(self):
+        self.bus_lock = open('/tmp/shift_ostrich_calibration.lock', 'w')
+        fcntl.flock(self.bus_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         device = self.config["bus"]["device"]
         baudrate = int(self.config["bus"]["baudrate"])
         if not self.port_handler.openPort():
             raise RuntimeError(f"Failed to open Dynamixel port: {device}")
         if not self.port_handler.setBaudRate(baudrate):
+            self.port_handler.closePort()
             raise RuntimeError(f"Failed to set Dynamixel baudrate: {baudrate}")
         self.get_logger().info(f"Opened Dynamixel bus {device} @ {baudrate}")
+        time.sleep(max(0., float(self.get_parameter('usb_settle_sec').value)))
+
+    def _ping_motors(self):
+        """Retry startup discovery and report all missing IDs before any writes."""
+        pending = {motor.id for motor in self.all_motors}
+        models = {}
+        attempts = max(1, int(self.get_parameter('startup_ping_attempts').value))
+        delay = max(0., float(self.get_parameter('startup_retry_delay_sec').value))
+        details = {}
+        for attempt in range(1, attempts+1):
+            for mid in sorted(pending):
+                model, result, error = self.packet_handler.ping(self.port_handler, mid)
+                if result == COMM_SUCCESS and error == 0:
+                    models[mid] = model
+                    pending.remove(mid)
+                    details.pop(mid, None)
+                else:
+                    details[mid] = (self.packet_handler.getTxRxResult(result) if result != COMM_SUCCESS
+                                    else self.packet_handler.getRxPacketError(error))
+            if not pending:
+                self.get_logger().info(f"Motor connection OK: IDs {sorted(models)}")
+                return models
+            self.get_logger().warn(f"Motor ping {attempt}/{attempts}: no valid response from IDs {sorted(pending)}")
+            if attempt < attempts:
+                time.sleep(delay)
+        if models or self.get_parameter('enable_opencr_imu').value:
+            self.get_logger().warn(
+                f"Continuing with connected motor IDs {sorted(models)}; "
+                f"offline IDs {sorted(pending)} will not receive commands. "
+                "Check their power/wiring/IDs/baudrate and restart to include them.")
+            if not models:
+                self.get_logger().info('No motor responses; continuing OpenCR IMU reading without motor commands')
+            return models
+        bus = self.config['bus']
+        raise RuntimeError(
+            f"Motor ping failed after {attempts} attempts: IDs {sorted(pending)}. "
+            f"Port {bus['device']}, baud {bus['baudrate']}, Protocol 2.0. "
+            f"Check motor power, OpenCR TTL bridge firmware/wiring, and bus baudrate; "
+            f"close other programs using the port. Details: {details}")
 
     def _configure_motors(self, torque_on_start: bool):
+        selected_text = self.get_parameter("torque_motor_ids").value.strip()
+        selected = {int(i) for i in selected_text.split(',')} if selected_text else {m.id for m in self.all_motors}
+        if not selected <= {m.id for m in self.all_motors}:
+            raise ValueError("Unknown torque_motor_ids")
+        if not self.get_parameter("enable_velocity_commands").value:
+            selected -= {m.id for m in self.velocity_motors}
+        states = {}
+        models = self._ping_motors()
+        self.all_motors = [motor for motor in self.all_motors if motor.id in models]
+        self.position_motors = [motor for motor in self.all_motors if motor.control_mode == 'position']
+        self.velocity_motors = [motor for motor in self.all_motors if motor.control_mode == 'velocity']
+        self.joint_to_motor = {motor.joint_name: motor for motor in self.position_motors}
+        selected.intersection_update(models)
+        # Preflight every selected motor before any register writes.
         for motor in self.all_motors:
-            self._write1(motor.id, ADDR_TORQUE_ENABLE, TORQUE_DISABLE)
-            self._write1(motor.id, ADDR_OPERATING_MODE, motor.operating_mode)
+            model = models[motor.id]
+            if model not in (1020, 1030, 1060, 1200):
+                raise ValueError(f"ID {motor.id}: unsupported model number {model}")
+            position = self._read_register(motor.id, ADDR_PRESENT_POSITION, 4)
+            states[motor.id] = dict(position=position, mode=self._read_register(motor.id, 11, 1),
+                torque=self._read_register(motor.id, 64, 1), drive=self._read_register(motor.id, 10, 1),
+                error=self._read_register(motor.id, 70, 1), voltage=self._read_register(motor.id, 144, 2)/10)
+            motor.min_tick = max(motor.configured_min_tick, self._read_register(motor.id, 52, 4))
+            motor.max_tick = min(motor.configured_max_tick, self._read_register(motor.id, 48, 4))
+            if not motor.direction_checked or (motor.control_mode == "position" and not motor.zero_checked):
+                self.get_logger().info(f"ID {motor.id}: manual mapping center={motor.center_tick}, "
+                                       f"direction={motor.direction}; confirm against RViz")
+            if not torque_on_start or motor.id not in selected:
+                continue
+            state = states[motor.id]
+            if motor.operating_mode == 5:
+                if model not in (1020, 1030, 1200):
+                    raise RuntimeError(f'ID {motor.id}: mode 5 is unsupported for verified model {model}')
+                current_limit = self._read_register(motor.id, 38, 2)
+                if current_limit <= 0:
+                    raise RuntimeError(f'ID {motor.id}: Current Limit is zero')
+                motor.goal_current = min(int(motor.goal_current), current_limit)
+            if state['error']:
+                raise RuntimeError(f"ID {motor.id}: motor hardware error: {state['error']}")
+            if motor.control_mode == 'position':
+                current = state['position'] % 4096
+                if not motor.min_tick <= current <= motor.max_tick:
+                    raise RuntimeError(
+                        f'ID {motor.id} {motor.joint_name}: current position {current} tick '
+                        f'is outside allowed [{motor.min_tick}, {motor.max_tick}]. '
+                        'Startup stopped before any motor writes; support the robot and '
+                        'place this joint inside its Wizard limits. No automatic boundary move.')
+        if not torque_on_start:
+            self.get_logger().info("Read-only startup: no mode, tuning, goal or torque writes")
+            return
+        self.preexisting_torque_ids = {m.id for m in self.all_motors
+                                      if states[m.id]['torque'] and states[m.id]['mode'] == m.operating_mode}
+        if self.get_parameter("passive_wheels").value:
+            for motor in self.velocity_motors:
+                # Release an existing position hold as well as velocity torque.
+                # Do not change wheel mode or move its shaft on the CH path.
+                self._write1(motor.id, ADDR_TORQUE_ENABLE, TORQUE_DISABLE)
+                if self._read_register(motor.id, ADDR_TORQUE_ENABLE, 1) != 0:
+                    raise RuntimeError(f"ID {motor.id}: passive wheel torque-off failed")
+            self.get_logger().info("CH passive wheels: torque OFF; no wheel position targets")
+        for motor in self.all_motors:
+            if motor.id not in selected:
+                continue
+            if states[motor.id]['mode'] != motor.operating_mode:
+                if states[motor.id]['torque']:
+                    self._write1(motor.id, ADDR_TORQUE_ENABLE, TORQUE_DISABLE)
+                self._write1(motor.id, ADDR_OPERATING_MODE, motor.operating_mode)
+                if self._read_register(motor.id, ADDR_OPERATING_MODE, 1) != motor.operating_mode:
+                    raise RuntimeError(f"ID {motor.id}: operating mode readback failed")
+            current = self._read_register(motor.id, ADDR_PRESENT_POSITION, 4) % 4096
+            if motor.control_mode == 'position' and not motor.min_tick <= current <= motor.max_tick:
+                raise RuntimeError(f'ID {motor.id}: current position changed outside allowed '
+                                   f'[{motor.min_tick}, {motor.max_tick}] before torque enable')
             self._apply_motor_tuning(motor)
             if motor.control_mode == "velocity":
                 self._write4(motor.id, ADDR_GOAL_VELOCITY, 0)
-            if torque_on_start:
-                self._write1(motor.id, ADDR_TORQUE_ENABLE, TORQUE_ENABLE)
-        torque_state = "enabled" if torque_on_start else "disabled"
-        self.get_logger().info(
-            f"Configured {len(self.position_motors)} position and "
-            f"{len(self.velocity_motors)} velocity motors, torque {torque_state}"
-        )
+            else:
+                self._write4(motor.id, ADDR_GOAL_POSITION, current)
+                self.last_goal_ticks[motor.id] = current
+            self.enabled_by_bridge.add(motor.id)
+            self._write1(motor.id, ADDR_TORQUE_ENABLE, TORQUE_ENABLE)
+            if self._read_register(motor.id, ADDR_TORQUE_ENABLE, 1) != 1:
+                raise RuntimeError(f"ID {motor.id}: torque enable readback failed")
+        self.get_logger().info(f"Torque enabled: {sorted(self.enabled_by_bridge)}")
+
+    def _read_register(self, mid, address, size):
+        value, result, error = getattr(self.packet_handler, f'read{size}ByteTxRx')(
+            self.port_handler, mid, address)
+        self._check_result(mid, address, result, error, operation="read")
+        return value
+
+    def _checked_goal_tick(self, motor, position):
+        if motor.id not in self.enabled_by_bridge or not math.isfinite(position):
+            return None
+        requested = round(motor.center_tick + motor.direction * position * motor.tick_per_rad)
+        if not motor.min_tick <= requested <= motor.max_tick:
+            self.get_logger().warn(
+                f'ID {motor.id} {motor.joint_name}: rejected {requested} tick; '
+                f'allowed [{motor.min_tick}, {motor.max_tick}]', throttle_duration_sec=2.0)
+            return None
+        return requested
 
     def _apply_motor_tuning(self, motor: MotorConfig):
         writes_2byte = (
+            ('goal_current', ADDR_GOAL_CURRENT, motor.goal_current if motor.operating_mode == 5 else None),
             ("pwm_limit", ADDR_PWM_LIMIT, motor.pwm_limit),
             ("position_d_gain", ADDR_POSITION_D_GAIN, motor.position_d_gain),
             ("position_i_gain", ADDR_POSITION_I_GAIN, motor.position_i_gain),
@@ -432,54 +615,48 @@ class DxlJointStateBridge(Node):
                 f"DXL {motor.id} {motor.joint_name} tuning: {', '.join(applied)}"
             )
 
+    def gripper_status_callback(self, request, response):
+        motor = self.joint_to_motor.get('gripper_pitch')
+        if motor is None:
+            response.success = False
+            response.message = 'ID 17 gripper is not connected'
+            return response
+        try:
+            values = {name: self._read_register(motor.id, address, size)
+                      for name, address, size in (
+                          ('mode',11,1), ('torque',64,1), ('hardware_error',70,1),
+                          ('p_gain',84,2), ('i_gain',82,2), ('d_gain',80,2),
+                          ('current_limit',38,2), ('goal_current',102,2),
+                          ('goal_tick',116,4), ('present_tick',132,4),
+                          ('present_current_raw',126,2), ('present_velocity_raw',128,4),
+                          ('voltage_raw',144,2), ('temperature',146,1),
+                          ('drive_mode',10,1), ('watchdog',98,1))}
+            response.success = True
+            response.message = json.dumps(values)
+        except Exception as exc:
+            response.success = False
+            response.message = str(exc)
+        return response
+
     def _center_position_motors(self):
-        self.get_logger().warn(
-            "center_on_start is true: sending center tick to all position motors"
-        )
-        self._sync_write_goal_ticks(
-            {motor: motor.center_tick for motor in self.position_motors}
-        )
-        self.get_logger().info("Sent center ticks to all position motors")
+        self._send_position_map({motor.joint_name: 0. for motor in self.position_motors},
+                                source="explicit_center")
 
     def _send_startup_ready_posture(self):
-        shoulder_pitch = math.radians(
-            float(self.get_parameter("startup_shoulder_pitch_deg").value)
-        )
-        ready_positions = {
-            "l_hip_yaw_jnt": 0.0,
-            "l_hip_roll_jnt": 0.0,
-            "l_hip_pitch_jnt": -READY_HIP_PITCH_RAD,
-            "l_knee_pitch_jnt": READY_KNEE_PITCH_RAD,
-            "l_ankle_pitch_jnt": READY_ANKLE_PITCH_RAD,
-            "l_foot_roll_jnt": 0.0,
-            "r_hip_yaw_jnt": 0.0,
-            "r_hip_roll_jnt": 0.0,
-            "r_hip_pitch_jnt": READY_HIP_PITCH_RAD,
-            "r_knee_pitch_jnt": READY_KNEE_PITCH_RAD,
-            "r_ankle_pitch_jnt": READY_ANKLE_PITCH_RAD,
-            "r_foot_roll_jnt": 0.0,
-            "arm_base_yaw_jnt": 0.0,
-            "arm_shoulder_pitch_jnt": shoulder_pitch,
-            "arm_elbow_pitch_jnt": 0.0,
-            "arm_wrist_pitch_jnt": 0.0,
-            "arm_wrist_roll_jnt": 0.0,
-        }
-        command_positions = {
-            motor.joint_name: ready_positions[motor.joint_name]
-            for motor in self.position_motors
-            if motor.joint_name in ready_positions
-        }
-        self.get_logger().warn(
-            "startup_ready_posture_on_start is true: sending forward-lean ready posture"
-        )
-        self._send_position_map(command_positions, source="startup_ready")
+        import sys
+        share = Path(get_package_share_directory('shift_ostrich'))
+        sys.path.insert(0, str(share))
+        from core.ready_posture import ready_targets
+        names, positions = ready_targets(share)
+        self._send_position_map(dict(zip(names, positions)),
+                                source="startup_ready")
 
     def joint_state_callback(self, msg: JointState):
         if not self.received_joint_states:
             self.received_joint_states = True
             matched = [name for name in msg.name if name in self.joint_to_motor]
             self.get_logger().info(
-                f"Received /joint_states with {len(msg.name)} joints; "
+                f"Received joint commands with {len(msg.name)} joints; "
                 f"{len(matched)} mapped to Dynamixel motors"
             )
 
@@ -490,23 +667,9 @@ class DxlJointStateBridge(Node):
 
             if not math.isfinite(position):
                 continue
-            command_limit = motor.command_abs_limit(self.max_abs_position_rad)
-            if abs(position) > command_limit:
-                self.get_logger().warn(
-                    f"Skip {joint_name}: {position:.3f} rad exceeds "
-                    f"command limit={command_limit:.3f} rad",
-                    throttle_duration_sec=1.0,
-                )
+            goal_tick = self._checked_goal_tick(motor, position)
+            if goal_tick is None:
                 continue
-            if not motor.position_in_range(position):
-                self.get_logger().warn(
-                    f"Skip {joint_name}: {position:.3f} rad outside mechanical "
-                    f"range [{motor.min_position_rad:.3f}, {motor.max_position_rad:.3f}]",
-                    throttle_duration_sec=1.0,
-                )
-                continue
-
-            goal_tick = motor.position_to_tick(position)
             prev_tick = self.last_goal_ticks.get(motor.id)
             if prev_tick is not None and abs(goal_tick - prev_tick) < self.min_tick_change:
                 continue
@@ -549,6 +712,16 @@ class DxlJointStateBridge(Node):
 
         if not trajectory:
             self.get_logger().warn("Ignored trajectory with no executable points")
+            return
+
+        if len(trajectory) == 1 and trajectory[0][0] == 0.0:
+            # Teleop sends a rate-limited streaming setpoint. Reanchoring this
+            # at measured position each update continually pulls a lagging
+            # motor's target back and restarts another interpolation.
+            self.active_trajectory = []
+            self.trajectory_start_positions = {}
+            self.trajectory_start_time = None
+            self._send_position_map(trajectory[0][1], source='streaming_setpoint')
             return
 
         start_positions = self._read_current_positions(commanded_names)
@@ -599,6 +772,8 @@ class DxlJointStateBridge(Node):
         goal_velocities = {}
         clamped = False
         for motor, requested_velocity in zip(self.velocity_motors, msg.data):
+            if motor.id not in self.enabled_by_bridge:
+                continue
             velocity = float(requested_velocity)
             if not math.isfinite(velocity):
                 velocity = 0.0
@@ -646,11 +821,7 @@ class DxlJointStateBridge(Node):
             motor = self.joint_to_motor[joint_name]
             tick = self._read_present_position_tick(motor)
             if tick is None:
-                tick = self.last_goal_ticks.get(motor.id, motor.center_tick)
-                self.get_logger().warn(
-                    f"Using last goal as interpolation start for {joint_name}",
-                    throttle_duration_sec=1.0,
-                )
+                raise RuntimeError(f"Cannot read actual trajectory start: {joint_name}")
             positions[joint_name] = motor.tick_to_position(tick)
         return positions
 
@@ -667,6 +838,7 @@ class DxlJointStateBridge(Node):
             )
             return None
         if error != 0:
+            self._log_motor_fault(motor.id)
             self.get_logger().error(
                 f"DXL {motor.id} position packet error: "
                 f"{self.packet_handler.getRxPacketError(error)}"
@@ -680,6 +852,18 @@ class DxlJointStateBridge(Node):
             1.0,
             float(self.get_parameter("present_joint_state_rate_hz").value),
         )
+        if self.get_parameter("sync_policy_feedback").value:
+            self.policy_feedback_fault = False
+            self.policy_fault_snapshot = None
+            self.policy_fault_pub = self.create_publisher(String, '/hardware/feedback_fault',
+                QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
+            self.policy_fault_pub.publish(String(data=json.dumps({'fault': False})))
+            self.policy_state_reader = GroupSyncRead(
+                self.port_handler, self.packet_handler, ADDR_PRESENT_VELOCITY, 8)
+            for motor in self.all_motors:
+                if not self.policy_state_reader.addParam(motor.id):
+                    raise RuntimeError(f"Cannot add feedback ID {motor.id}")
+            self.policy_fault_timer = self.create_timer(1.0, self.policy_fault_callback)
         self.present_joint_state_timer = self.create_timer(
             1.0 / rate_hz,
             self.present_joint_state_callback,
@@ -688,7 +872,50 @@ class DxlJointStateBridge(Node):
             f"Publishing present Dynamixel joint states to {topic} at {rate_hz:.1f} Hz"
         )
 
+    def policy_fault_callback(self):
+        # Latch a fault by withdrawing complete feedback. The policy then stops
+        # issuing targets; the bridge holds its last goal until operator action.
+        if self.policy_feedback_fault:
+            return
+        for motor in self.position_motors:
+            error, comm, packet_error = self.packet_handler.read1ByteTxRx(
+                self.port_handler, motor.id, ADDR_HARDWARE_ERROR_STATUS)
+            torque, torque_comm, torque_error = self.packet_handler.read1ByteTxRx(
+                self.port_handler, motor.id, ADDR_TORQUE_ENABLE)
+            if (comm != COMM_SUCCESS or packet_error or error or
+                    torque_comm != COMM_SUCCESS or torque_error or torque != 1):
+                self.policy_feedback_fault = True
+                snapshot = {
+                    'fault': True, 'motor_id': motor.id,
+                    'joint': getattr(motor, 'joint_name', 'unknown'),
+                    'hardware_error': int(error) if comm == COMM_SUCCESS else None,
+                    'error_flags': [name for bit,name in HARDWARE_ERROR_BITS.items()
+                                    if comm == COMM_SUCCESS and error & (1 << bit)],
+                    'torque': int(torque) if torque_comm == COMM_SUCCESS else None,
+                    'error_read_comm': int(comm), 'error_read_packet': int(packet_error),
+                    'torque_read_comm': int(torque_comm), 'torque_read_packet': int(torque_error),
+                }
+                # Read-only evidence; never reboot, clear errors or re-enable torque.
+                for name,address,size in (('voltage_raw',144,2), ('temperature_c',146,1),
+                                           ('position_tick',132,4), ('goal_tick',116,4)):
+                    try:
+                        value,result,alert = getattr(self.packet_handler, f'read{size}ByteTxRx')(
+                            self.port_handler,motor.id,address)
+                        snapshot[name] = int(value) if result == COMM_SUCCESS else None
+                    except Exception:
+                        snapshot[name] = None
+                self.policy_fault_snapshot = snapshot
+                message = json.dumps(snapshot)
+                self.get_logger().error('Hardware feedback latched OFF: ' + message)
+                pub = getattr(self, 'policy_fault_pub', None)
+                if pub is not None:
+                    pub.publish(String(data=message))
+                return
+
     def present_joint_state_callback(self):
+        if hasattr(self, "policy_state_reader"):
+            self.policy_sync_state_callback()
+            return
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
 
@@ -704,6 +931,29 @@ class DxlJointStateBridge(Node):
         if msg.name:
             self.present_joint_state_pub.publish(msg)
 
+    def policy_sync_state_callback(self):
+        if self.policy_feedback_fault:
+            return
+        reader = self.policy_state_reader
+        if reader.txRxPacket() != COMM_SUCCESS:
+            return
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        for motor in self.all_motors:
+            if not reader.isAvailable(motor.id, ADDR_PRESENT_VELOCITY, 8):
+                return  # Never refresh the timestamp with incomplete feedback.
+            velocity = reader.getData(motor.id, ADDR_PRESENT_VELOCITY, 4)
+            tick = reader.getData(motor.id, ADDR_PRESENT_POSITION, 4)
+            if velocity & (1 << 31):
+                velocity -= 1 << 32
+            if tick & (1 << 31):
+                tick -= 1 << 32
+            msg.name.append(motor.joint_name)
+            msg.position.append(motor.tick_to_position(tick))
+            msg.velocity.append(motor.direction * velocity / self.velocity_raw_per_rad_s)
+            msg.effort.append(0.0)
+        self.present_joint_state_pub.publish(msg)
+
     def _setup_telemetry_logger(self):
         if GroupSyncRead is None:
             raise RuntimeError(
@@ -716,7 +966,7 @@ class DxlJointStateBridge(Node):
             log_path = os.path.join(
                 os.getcwd(),
                 "src",
-                "biped_bike_robot",
+                "shift_ostrich",
                 "motor_logs",
                 f"dxl_telemetry_{stamp}.csv",
             )
@@ -1003,41 +1253,32 @@ class DxlJointStateBridge(Node):
         return "|".join(flags) if flags else f"unknown_bits_{status}"
 
     def _send_position_map(self, positions: Dict[str, float], source: str):
+        if getattr(self, "policy_feedback_fault", False):
+            return
         goal_ticks = {}
-        global_limit_skipped = 0
 
         for joint_name, position in positions.items():
             motor = self.joint_to_motor.get(joint_name)
             if motor is None or not math.isfinite(position):
                 continue
-            command_limit = motor.command_abs_limit(self.max_abs_position_rad)
-            if abs(position) > command_limit:
-                global_limit_skipped += 1
+            goal_tick = self._checked_goal_tick(motor, position)
+            if goal_tick is None:
                 continue
-            if not motor.position_in_range(position):
-                self.get_logger().warn(
-                    f"Skipped {source} command for {joint_name}: {position:.3f} rad "
-                    f"outside mechanical range "
-                    f"[{motor.min_position_rad:.3f}, {motor.max_position_rad:.3f}]",
-                    throttle_duration_sec=1.0,
-                )
-                continue
-
-            goal_tick = motor.position_to_tick(position)
             prev_tick = self.last_goal_ticks.get(motor.id)
             if prev_tick is not None and abs(goal_tick - prev_tick) < self.min_tick_change:
                 continue
             goal_ticks[motor] = goal_tick
 
-        if global_limit_skipped > 0:
-            self.get_logger().warn(
-                f"Skipped {global_limit_skipped} {source} joints over "
-                "their absolute command limits",
-                throttle_duration_sec=1.0,
-            )
-
         if goal_ticks:
-            self._sync_write_goal_ticks(goal_ticks)
+            # Use the same acknowledged ID-17 write as the working sliders.
+            # SyncWrite has no status reply, so it cannot report a gripper
+            # hardware Alert at command delivery time.
+            gripper = next((m for m in goal_ticks if m.id == 17), None)
+            gripper_tick = goal_ticks.pop(gripper) if gripper is not None else None
+            if goal_ticks:
+                self._sync_write_goal_ticks(goal_ticks)
+            if gripper is not None:
+                self._write_goal_tick(gripper, gripper_tick)
 
     def _write_goal_tick(self, motor: MotorConfig, goal_tick: int):
         self._write4(motor.id, ADDR_GOAL_POSITION, goal_tick)
@@ -1049,14 +1290,13 @@ class DxlJointStateBridge(Node):
         for motor, goal_tick in goal_ticks.items():
             param = int(goal_tick).to_bytes(4, byteorder="little", signed=False)
             if not self.group_sync_write.addParam(motor.id, list(param)):
-                self.get_logger().error(f"Failed to add DXL {motor.id} to sync write")
+                raise RuntimeError(f"Failed to add DXL {motor.id} to sync write")
 
         result = self.group_sync_write.txPacket()
         if result != COMM_SUCCESS:
-            self.get_logger().error(
+            raise RuntimeError(
                 f"Sync write failed: {self.packet_handler.getTxRxResult(result)}"
             )
-            return
 
         for motor, goal_tick in goal_ticks.items():
             self.last_goal_ticks[motor.id] = goal_tick
@@ -1067,16 +1307,15 @@ class DxlJointStateBridge(Node):
         for motor, goal_velocity in goal_velocities.items():
             param = int(goal_velocity).to_bytes(4, byteorder="little", signed=True)
             if not self.group_sync_write_velocity.addParam(motor.id, list(param)):
-                self.get_logger().error(
+                raise RuntimeError(
                     f"Failed to add DXL {motor.id} to velocity sync write"
                 )
 
         result = self.group_sync_write_velocity.txPacket()
         if result != COMM_SUCCESS:
-            self.get_logger().error(
+            raise RuntimeError(
                 f"Velocity sync write failed: {self.packet_handler.getTxRxResult(result)}"
             )
-            return
 
         for motor, goal_velocity in goal_velocities.items():
             self.last_goal_velocities[motor.id] = goal_velocity
@@ -1099,14 +1338,52 @@ class DxlJointStateBridge(Node):
         )
         self._check_result(dxl_id, address, result, error)
 
-    def _check_result(self, dxl_id: int, address: int, result: int, error: int):
+    def _log_motor_fault(self, mid):
+        """Read fault evidence directly, including data returned with Alert set."""
+        if not hasattr(self, 'faulted_motor_ids'):
+            self.faulted_motor_ids = set()
+        self.faulted_motor_ids.add(mid)
+        snapshot = {'id': mid}
+        for name, address, size in (('hardware_error', 70, 1), ('watchdog', 98, 1),
+                                    ('voltage_raw', 144, 2), ('temperature', 146, 1),
+                                    ('present_current_raw', 126, 2)):
+            try:
+                value, comm, error = getattr(self.packet_handler, f'read{size}ByteTxRx')(
+                    self.port_handler, mid, address)
+                snapshot[name] = {'value': value, 'comm': comm, 'packet_error': error}
+            except Exception as exc:
+                snapshot[name] = str(exc)
+        self.get_logger().error('Motor fault snapshot: ' + json.dumps(snapshot))
+        if mid == 17 and mid in self.enabled_by_bridge:
+            self._stop_faulted_gripper()
+
+    def _stop_faulted_gripper(self):
+        # Alert (bit 7) accompanies otherwise valid status replies even to
+        # torque-OFF commands. Accept that flag, but reject transport/instruction
+        # failures, and attempt both stop operations independently.
+        failures = []
+        for address, size in ((ADDR_GOAL_CURRENT, 2), (ADDR_TORQUE_ENABLE, 1)):
+            try:
+                comm, error = getattr(self.packet_handler, f'write{size}ByteTxRx')(
+                    self.port_handler, 17, address, 0)
+                if comm != COMM_SUCCESS or error & 0x7f:
+                    failures.append(f'{address}: comm={comm}, error={error}')
+            except Exception as exc:
+                failures.append(str(exc))
+        if failures:
+            raise RuntimeError('ID 17 fault stop failed: ' + '; '.join(failures))
+        self.enabled_by_bridge.discard(17)
+        self.get_logger().error('ID 17 fault: current zeroed, torque OFF; other motor torque retained')
+
+    def _check_result(self, dxl_id: int, address: int, result: int, error: int, operation="write"):
         if result != COMM_SUCCESS:
-            self.get_logger().error(
-                f"DXL {dxl_id} write failed at {address}: "
+            raise RuntimeError(
+                f"DXL {dxl_id} {operation} failed at {address}: "
                 f"{self.packet_handler.getTxRxResult(result)}"
             )
         elif error != 0:
-            self.get_logger().error(
+            self._log_motor_fault(dxl_id)
+            raise RuntimeError(
                 f"DXL {dxl_id} packet error at {address}: "
                 f"{self.packet_handler.getRxPacketError(error)}"
             )
@@ -1114,12 +1391,30 @@ class DxlJointStateBridge(Node):
 
 def main(args: Optional[List[str]] = None):
     rclpy.init(args=args)
-    node = DxlJointStateBridge()
+    node = DxlJointStateBridge.__new__(DxlJointStateBridge)
+    exit_code = 0
     try:
+        DxlJointStateBridge.__init__(node)
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    except (RuntimeError, ValueError, OSError) as exc:
+        node.get_logger().error(str(exc))
+        # A runtime fault must use the same guarded release as a failed handoff.
+        # Otherwise a gripper fault would cut the preexisting leg holding torque.
+        node.startup_complete = False
+        exit_code = 1
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        try:
+            if hasattr(node, 'all_motors') and hasattr(node, 'port_handler'):
+                node.destroy_node()
+            elif hasattr(node, 'handle'):
+                Node.destroy_node(node)
+        finally:
+            if rclpy.ok():
+                rclpy.shutdown()
+    if exit_code:
+        raise SystemExit(exit_code)
 
 
 if __name__ == "__main__":
