@@ -11,14 +11,14 @@ ShiftOstrich는 이족보행 하체에 바퀴와 매니퓰레이터를 결합한
 ### 실물 보행 실험
 
 <p align="center">
-  <img src="media/walking_ost.gif" alt="ShiftOstrich 실물 보행 실험" width="320">
+  <img src="media/walking_ost_240.gif" alt="ShiftOstrich 실물 보행 실험" width="320">
 </p>
 
 ### 보행 자세 ↔ 차륜 주행 자세
 
 | 변신 | 역변신 |
 |:---:|:---:|
-| <img src="media/transform_ost.gif" alt="보행 자세에서 차륜 주행 자세로 변신" width="420"> | <img src="media/revert_ost.gif" alt="차륜 주행 자세에서 보행 자세로 역변신" width="420"> |
+| <img src="media/transform_ost_240.gif" alt="보행 자세에서 차륜 주행 자세로 변신" width="420"> | <img src="media/revert_ost_240.gif" alt="차륜 주행 자세에서 보행 자세로 역변신" width="420"> |
 
 ## 주요 특징
 
